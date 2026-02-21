@@ -22,8 +22,8 @@ export default async function QRPage({ params }: PageProps) {
   }
 
   // Construir la URL completa hacia la página del paciente
-  // En producción, deberías usar tu dominio real (ej: https://mivitalqr.com)
-  // Para desarrollo local, usamos localhost
+  // En producción: https://vitalqr.vercel.app
+  // En desarrollo: http://localhost:3000
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const pacienteUrl = `${baseUrl}/paciente/${id}`;
 
