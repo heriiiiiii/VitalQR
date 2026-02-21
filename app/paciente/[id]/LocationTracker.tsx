@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 
 interface LocationTrackerProps {
   pacienteId: string;
-  onLocationVerified: (data: any) => void;
 }
 
-export default function LocationTracker({ pacienteId, onLocationVerified }: LocationTrackerProps) {
+export default function LocationTracker({ pacienteId }: LocationTrackerProps) {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [mensaje, setMensaje] = useState<string>("");
+  const [esZonaSegura, setEsZonaSegura] = useState<boolean>(false);
 
   useEffect(() => {
     // Función para obtener y enviar la ubicación
@@ -38,13 +38,13 @@ export default function LocationTracker({ pacienteId, onLocationVerified }: Loca
         };
 
         let position: GeolocationPosition;
-        
+
         try {
           // Primer intento: Alta precisión con 15 segundos
           position = await obtenerUbicacion(true, 15000);
         } catch (error: any) {
           console.warn("Intento 1 falló, intentando con baja precisión:", error.message);
-          
+
           try {
             // Segundo intento: Baja precisión (más rápido) con 10 segundos
             position = await obtenerUbicacion(false, 10000);
@@ -64,7 +64,7 @@ export default function LocationTracker({ pacienteId, onLocationVerified }: Loca
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              pacienteId,
+              qr_id: pacienteId,
               latitude,
               longitude,
             }),
@@ -72,12 +72,10 @@ export default function LocationTracker({ pacienteId, onLocationVerified }: Loca
 
           const data = await response.json();
 
-          if (response.ok && (data.status === 'SAFE' || data.status === 'ALERT')) {
+          if (response.ok && (data.status === "SAFE" || data.status === "ALERT")) {
             setStatus("success");
             setMensaje(data.message);
-            
-            // Pasar los datos al componente padre
-            onLocationVerified(data);
+            setEsZonaSegura(data.status === "SAFE");
           } else {
             setStatus("error");
             setMensaje(data.error || "Error al validar ubicación");
@@ -90,7 +88,7 @@ export default function LocationTracker({ pacienteId, onLocationVerified }: Loca
       } catch (error: any) {
         console.error("Error al obtener ubicación:", error);
         setStatus("error");
-        
+
         // Mensajes de error más específicos
         if (error.code !== undefined) {
           switch (error.code) {
@@ -114,7 +112,12 @@ export default function LocationTracker({ pacienteId, onLocationVerified }: Loca
 
     // Ejecutar la función
     enviarUbicacion();
-  }, [pacienteId, onLocationVerified]);
+  }, [pacienteId]);
+
+  // No mostrar nada si ya se completó exitosamente
+  if (status === "success" && esZonaSegura) {
+    return null;
+  }
 
   // Mostrar indicador de carga
   if (status === "loading") {
@@ -128,20 +131,36 @@ export default function LocationTracker({ pacienteId, onLocationVerified }: Loca
     );
   }
 
-  // Mostrar estado de error
-  if (status === "error") {
+  // Mostrar alerta si NO está en zona segura o hay error
+  if (status === "error" || !esZonaSegura) {
     return (
-      <div className="border-2 rounded-2xl p-4 mb-3 bg-red-50 border-red-200">
+      <div
+        className={`border-2 rounded-2xl p-4 mb-3 ${status === "error"
+            ? "bg-red-50 border-red-200"
+            : "bg-yellow-50 border-yellow-300"
+          }`}
+      >
         <div className="flex items-start gap-3">
-          <span className="text-2xl">❌</span>
+          <span className="text-2xl">
+            {status === "error" ? "❌" : "⚠️"}
+          </span>
           <div className="flex-1">
-            <p className="font-semibold text-red-800">{mensaje}</p>
+            <p
+              className={`font-semibold ${status === "error" ? "text-red-800" : "text-yellow-800"
+                }`}
+            >
+              {mensaje}
+            </p>
+            {!esZonaSegura && status === "success" && (
+              <p className="text-sm text-yellow-700 mt-1">
+                Este acceso ha sido registrado en el historial
+              </p>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  // Si fue exitoso, no mostramos nada (los datos se muestran en el componente padre)
   return null;
 }
